@@ -3,7 +3,34 @@ import subprocess
 import random
 import run_config
 import shutil
-def train():
+
+import os
+import subprocess
+import run_config
+import shutil
+
+
+def run_with_logging(cmd, log_file_handle):
+    """运行命令，并将输出同时写入 log_file_handle 和控制台"""
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True
+    )
+
+    # ✅ 修复：删除了 with log_file_handle: 这行
+    for line in proc.stdout:
+        print(line, end='')
+        log_file_handle.write(line)
+        log_file_handle.flush()
+
+    return proc.wait()
+
+
+def train(log_file_handle):
     """
     单卡训练入口。
     内部自动构造命令并调用 tracking/train.py。
@@ -11,22 +38,22 @@ def train():
     # -------------------------------
     # ✅ 可自定义参数
     # -------------------------------
-    script = "odtrack"                      # 训练脚本名
-    config = "baseline"                    # 配置文件名
-    save_dir = f"./experiments/{run_config.dataname}"        # 日志、模型保存路径
-    use_lmdb = 0                           # 是否使用 LMDB 数据
-    use_wandb = 0                          # 是否启用 wandb
-    distill = 0                            # 是否启用知识蒸馏
-    script_prv = "none"                    # 预训练 student 脚本
-    config_prv = "none"                    # 预训练配置
-    script_teacher = "none"                # teacher 脚本
-    config_teacher = "none"                # teacher 配置
+    script = "odtrack"  # 训练脚本名
+    config = "baseline"  # 配置文件名
+    save_dir = f"./experiments/{run_config.dataname}"  # 日志、模型保存路径
+    use_lmdb = 0  # 是否使用 LMDB 数据
+    use_wandb = 0  # 是否启用 wandb
+    distill = 0  # 是否启用知识蒸馏
+    script_prv = "none"  # 预训练 student 脚本
+    config_prv = "none"  # 预训练配置
+    script_teacher = "none"  # teacher 脚本
+    config_teacher = "none"  # teacher 配置
 
     # -------------------------------
     # ✅ 构造单卡训练命令
     # -------------------------------
     cmd = [
-        "python", "tracking/train.py",
+        "python", "-u", "tracking/train.py",
         "--mode", "single",
         "--script", script,
         "--config", config,
@@ -40,16 +67,20 @@ def train():
         "--use_wandb", str(use_wandb)
     ]
 
-    print("=" * 80)
-    print("🚀 [run.py] Launching single-GPU training")
-    print(cmd)
-    print("=" * 80)
+    separator = "=" * 80
+    print_log = lambda msg: print_and_log(msg, log_file_handle)
+    print_log(separator)
+    print_log("🚀 [run.py] Launching single-GPU training")
+    print_log(str(cmd))
+    print_log(separator)
 
-    subprocess.run(cmd)
-    print("✅ Training finished successfully!")
+    exit_code = run_with_logging(cmd, log_file_handle)
+    if exit_code != 0:
+        raise RuntimeError(f"Training failed with exit code {exit_code}")
+    print_log("✅ Training finished successfully!")
 
 
-def test():
+def test(log_file_handle):
     """
     单卡测试入口。
     内部自动构造命令并调用 tracking/test.py。
@@ -58,7 +89,7 @@ def test():
     # ✅ 构造测试命令
     # -------------------------------
     cmd = [
-        "python", "tracking/test.py",
+        "python", "-u", "tracking/test.py",
         "odtrack",  # tracker_name 位置参数
         "baseline",  # tracker_param 位置参数
         "--dataset_name", "lasot",
@@ -67,48 +98,66 @@ def test():
         "--num_gpus", "0"
     ]
 
-    print("=" * 80)
-    print("🚀 [run.py] Launching single-GPU testing")
-    print(" ".join(cmd))  # 更好地显示命令
-    print("=" * 80)
+    separator = "=" * 80
+    print_log = lambda msg: print_and_log(msg, log_file_handle)
+    print_log(separator)
+    print_log("🚀 [run.py] Launching single-GPU testing")
+    print_log(" ".join(cmd))
+    print_log(separator)
 
-    subprocess.run(cmd)
-    print("✅ Testing finished successfully!")
-    
+    exit_code = run_with_logging(cmd, log_file_handle)
+    if exit_code != 0:
+        raise RuntimeError(f"Testing failed with exit code {exit_code}")
+    print_log("✅ Testing finished successfully!")
 
+
+def print_and_log(message, log_file_handle):
+    """同时打印到控制台和日志文件"""
+    print(message)
+    log_file_handle.write(str(message) + "\n")
+    log_file_handle.flush()
 
 
 def main():
-    """
-    主入口，目前仅支持训练。
-    后续可扩展 test(), eval(), etc.
-    """
-    datasets=[
-    "Anti-UAV410",
-    "CST-AntiUAV"]
+    datasets = ["Anti-UAV410", "CST-AntiUAV"]
     for dataset in datasets:
-      with open("run_config.py", "w", encoding="utf-8") as f:
-        f.write(f"dataname= '{dataset}'\n")
-      run_config.dataname = dataset
-      # 源文件路径（要复制内容的文件）
-      if run_config.dataname == 'CST-AntiUAV':
-         src = 'lib/train/data_specs/lasot_train_split-cts-antiuav.txt'
-      elif run_config.dataname == 'Anti-UAV410':
-         src = 'lib/train/data_specs/lasot_train_split-antiuav.txt'
-      # 目标文件路径（要被覆盖的文件）
-      dst = 'lib/train/data_specs/lasot_train_split.txt'
-      # 使用 shutil.copyfile 覆盖目标文件内容
-      shutil.copyfile(src, dst)
-      print(f"已将 {src} 的内容复制到 {dst}")
-      
-      print(f"当前数据集：{run_config.dataname}")
-      train()
-      test()
-      # 现在开始输出测试结果
-      import subprocess
-      with open(f"{run_config.dataname}_analysis_results.txt", "w") as log_file:
-           subprocess.run(["python", "tracking/analysis_results.py"], stdout=log_file, stderr=subprocess.STDOUT)
-      print(f"当前数据集：{run_config.dataname}")
+        log_dir = f"./experiments/{dataset}"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file_path = os.path.join(log_dir, "run_full_log.txt")
+
+        # 更新 run_config.py
+        with open("run_config.py", "w", encoding="utf-8") as f:
+            f.write(f"dataname = '{dataset}'\n")
+        run_config.dataname = dataset
+
+        # 复制数据划分文件
+        if dataset == 'CST-AntiUAV':
+            src = 'lib/train/data_specs/lasot_train_split-cts-antiuav.txt'
+        else:  # Anti-UAV410
+            src = 'lib/train/data_specs/lasot_train_split-antiuav.txt'
+        dst = 'lib/train/data_specs/lasot_train_split.txt'
+        shutil.copyfile(src, dst)
+
+        # 打开日志文件（每个 dataset 独立）
+        with open(log_file_path, "w", encoding="utf-8") as log_f:
+            print_and_log(f"📝 Logging all output to: {log_file_path}", log_f)
+            print_and_log(f"已将 {src} 的内容复制到 {dst}", log_f)
+            print_and_log(f"当前数据集：{dataset}", log_f)
+
+            # 训练
+            train(log_f)
+
+            # 测试
+            test(log_f)
+
+            # 分析结果
+            print_and_log(f"📊 Running analysis for {dataset}...", log_f)
+            analysis_cmd = ["python", "-u", "tracking/analysis_results.py"]
+            exit_code = run_with_logging(analysis_cmd, log_f)
+            if exit_code != 0:
+                print_and_log(f"⚠️ Analysis failed with exit code {exit_code}", log_f)
+            else:
+                print_and_log(f"✅ Finished analysis for {dataset}", log_f)
 
 
 if __name__ == "__main__":

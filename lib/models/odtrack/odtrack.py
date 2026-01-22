@@ -82,6 +82,7 @@ class InvertedDifferenceFusion(nn.Module):
         # 3. 软差分融合
         # 类似于 Center-Surround 机制。
         # 如果 fusion_weight 变为负值，网络实际上就在做 x_3x3 - x_5x5 (高通滤波)
+        print("self.fusion_weight:  ",self.fusion_weight)
         x_fused = x_3x3 + self.fusion_weight * (x_5x5 - x_3x3)
         x_fused = self.act(x_fused)
         
@@ -92,11 +93,11 @@ class InvertedDifferenceFusion(nn.Module):
         # [B, C, H, W] -> [B, HW, C]
         x_out = x_out.flatten(2).transpose(1, 2)
         
-        return x_vit + self.gamma * x_out
+        return x_vit + self.gamma * x_out,x_high, x_3x3, x_5x5
 
 
 # 新增：动态特征路由模块 - 放在InvertedDifferenceFusion模块之后
-class DynamicFeatureRouter(nn.Module):
+class DynamicFeatureRouter(nn.Module):#TGG
     def __init__(self, dim, feat_sz):
         super().__init__()
         self.feat_sz = feat_sz
@@ -121,7 +122,7 @@ class DynamicFeatureRouter(nn.Module):
         # 这才叫真正的“全局信息输入”，因为它引入了搜索区域之外的、确定性的目标信息
         filtered_feat = search_refined * gate 
         
-        return search_vit + filtered_feat
+        return search_vit + filtered_feat,gate
 
 class ODTrack(nn.Module):
     def __init__(self, transformer, box_head, aux_loss=False, head_type="CORNER", token_len=1):
@@ -178,11 +179,11 @@ class ODTrack(nn.Module):
                 self.track_query = (x[:, :self.token_len].clone()).detach()
 
             # --- 改进点一：局部差分增强 ---
-            enc_opt_refined = self.fusion_module(enc_opt)
+            enc_opt_refined,x_high, x_3x3, x_5x5 = self.fusion_module(enc_opt)
             
             # --- 关键修正 B：模板引导的动态路由 ---
             # 必须传入 target_global，否则这个模块只是在“闭门造车”
-            enc_opt_fused = self.dynamic_router(enc_opt, enc_opt_refined, target_global)
+            enc_opt_fused,gate= self.dynamic_router(enc_opt, enc_opt_refined, target_global)
             # ----------------------------------
 
             # 计算注意力矩阵用于融合 (保持原版逻辑)
@@ -194,7 +195,22 @@ class ODTrack(nn.Module):
             
             out = self.forward_head(opt, None)
             out.update(aux_dict)
+            
             out['backbone_feat'] = x
+            out['visualization_data']={
+                'x_high': x_high.detach().cpu().numpy(),
+                'x_3x3': x_3x3.detach().cpu().numpy(),
+                'x_5x5': x_5x5.detach().cpu().numpy(),
+                'x_diff': (x_5x5 - x_3x3).detach().cpu().numpy(),
+                'gate': gate.detach().cpu().numpy(),
+                # 原始
+                'feat_1_input': enc_opt.detach().cpu().numpy(),
+                # 阶段2: IDF 增强后
+                'feat_2_idf': enc_opt_refined.detach().cpu().numpy(),
+                
+                # 阶段3: DFR 过滤后 (最终输出)
+                'feat_3_dfr': enc_opt_fused.detach().cpu().numpy(),
+            }
             out_dict.append(out)
             
         return out_dict

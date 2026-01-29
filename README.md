@@ -61,7 +61,6 @@ The framework is built on top of the ODTrack backbone, with the following additi
 | **Pre-trained ViT** | MAE/ViT backbone weights | [Baidu Pan](https://pan.baidu.com/s/1MhtHwN8Vvof9pZBTA1YMzQ?pwd=qieq) | `qieq` |
 | **Trained Models** | Trained `odtrack_IDF` and final weights | [Baidu Pan](https://pan.baidu.com/s/1ncy5dksAGKKcttkgQAy2Bw?pwd=cxzt) | `cxzt` |
 | **Datasets** | Anti-UAV410 & CST-AntiUAV | [Baidu Pan](https://pan.baidu.com/s/1C9e7_cJ7gXDzgI1CnUpONg?pwd=a684 | `a684`|
---来自百度网盘超级会员v9的分享) | N/A |
 
 ---
 

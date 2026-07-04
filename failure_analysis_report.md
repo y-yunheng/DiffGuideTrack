@@ -59,11 +59,8 @@
 | CST-AntiUAV | jungle_14 | 1295 | 0.526 | 0.520 | -0.006 | 0.997 | 0.997 | 1295 | 1295 | 1.000 | 1.000 | Both_Success |
 | CST-AntiUAV | cn_sky_15 | 1000 | 0.489 | 0.482 | -0.006 | 0.939 | 0.939 | 117 | 117 | 0.117 | 0.117 | Both_Success |
 
-## 3. 最终结论 —— 直接回应审稿人 Comment 6
+## 3. 最终结论
 
-> **Reviewer Comment 6.** *The visualization in Table 6 shows qualitative examples but does not report quantitative tracking failure rates (e.g., number of sequences where ODTrack fails while DiffGuideTrack succeeds, or vice versa); please include a per-sequence success analysis or a tracking robustness metric (e.g., tracking length before first failure) to support the claimed superiority.*
-
-下表给出**所有数据集**上的定量跟踪失败率、逐序列成功/失败对比 (Ours→Win vs. ODTrack→Win) 以及 **TRAC 鲁棒性指标（首次故障前的跟踪长度）**，直接满足审稿人要求：
 
 | Dataset | #Seq | ODTrack Failed Seq | Ours Failed Seq | ODTrack FailRate(%) | Ours FailRate(%) | Ours→Win vs ODTrack | ODTrack→Win vs Ours | Both Success | Both Fail | ODTrack TRAC-len (frames) | Ours TRAC-len (frames) | Δ TRAC-len |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
